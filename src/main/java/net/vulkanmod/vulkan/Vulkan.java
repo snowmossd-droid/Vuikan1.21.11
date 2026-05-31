@@ -44,7 +44,8 @@ public class Vulkan {
         public static final boolean ENABLE_VALIDATION_LAYERS = false;
 //    public static final boolean ENABLE_VALIDATION_LAYERS = true;
 
-    public static final boolean DYNAMIC_RENDERING = true;
+    // Set to false initially; will be enabled at runtime only if the device supports VK_KHR_dynamic_rendering
+    public static boolean DYNAMIC_RENDERING = false;
 
     public static final Set<String> VALIDATION_LAYERS;
 
@@ -60,16 +61,29 @@ public class Vulkan {
         }
     }
 
-    public static final Set<String> REQUIRED_EXTENSION = getRequiredExtensionSet();
+    // Mutable so initDynamicRendering() can add VK_KHR_dynamic_rendering if the device supports it
+    public static Set<String> REQUIRED_EXTENSION = getRequiredExtensionSet();
 
     private static Set<String> getRequiredExtensionSet() {
-        ArrayList<String> extensions = new ArrayList<>(List.of(VK_KHR_SWAPCHAIN_EXTENSION_NAME));
+        // Only require swapchain by default; dynamic rendering is optional and checked at runtime
+        return new HashSet<>(List.of(VK_KHR_SWAPCHAIN_EXTENSION_NAME));
+    }
 
-        if (DYNAMIC_RENDERING) {
-            extensions.add(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    /**
+     * Called by DeviceManager after a physical device is selected.
+     * Enables dynamic rendering only if the chosen GPU supports VK_KHR_dynamic_rendering.
+     */
+    public static void initDynamicRendering(Set<String> availableExtensionNames) {
+        if (availableExtensionNames.contains(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)) {
+            DYNAMIC_RENDERING = true;
+            REQUIRED_EXTENSION.add(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+            net.vulkanmod.Initializer.LOGGER.info("VK_KHR_dynamic_rendering supported -- enabling dynamic rendering.");
+        } else {
+            DYNAMIC_RENDERING = false;
+            net.vulkanmod.Initializer.LOGGER.warn(
+                "VK_KHR_dynamic_rendering NOT supported by this GPU. " +
+                "Running without dynamic rendering (Android/PowerVR fallback).");
         }
-
-        return new HashSet<>(extensions);
     }
 
     private static int debugCallback(int messageSeverity, int messageType, long pCallbackData, long pUserData) {
@@ -428,3 +442,4 @@ public class Vulkan {
     }
 }
 
+            
