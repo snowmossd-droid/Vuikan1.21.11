@@ -49,10 +49,21 @@ public abstract class DeviceManager {
         try {
             DeviceManager.getSuitableDevices(instance);
             DeviceManager.pickPhysicalDevice();
+            // Detect VK_KHR_dynamic_rendering support on the chosen device BEFORE creating
+            // the logical device, so REQUIRED_EXTENSION is finalised correctly.
+            Vulkan.initDynamicRendering(getAvailableExtensionNames(physicalDevice));
             DeviceManager.createLogicalDevice();
         } catch (Exception e) {
             Initializer.LOGGER.info(getAvailableDevicesInfo());
             throw new RuntimeException(e);
+        }
+    }
+
+    private static java.util.Set<String> getAvailableExtensionNames(VkPhysicalDevice device) {
+        try (MemoryStack stack = stackPush()) {
+            return getAvailableExtension(stack, device).stream()
+                    .map(VkExtensionProperties::extensionNameString)
+                    .collect(java.util.stream.Collectors.toSet());
         }
     }
 
@@ -423,4 +434,5 @@ public abstract class DeviceManager {
         public IntBuffer presentModes;
     }
 
-}
+        }
+        
