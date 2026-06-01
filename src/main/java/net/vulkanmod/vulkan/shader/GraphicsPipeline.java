@@ -54,7 +54,12 @@ public class GraphicsPipeline extends Pipeline {
     }
 
     public long getHandle(PipelineState state) {
-        return graphicsPipelines.computeIfAbsent(state, this::createGraphicsPipeline);
+        long handle = graphicsPipelines.computeIfAbsent(state, this::createGraphicsPipeline);
+        // If pipeline creation was deferred (null renderpass), evict so we retry next frame
+        if (handle == VK_NULL_HANDLE) {
+            graphicsPipelines.removeLong(state);
+        }
+        return handle;
     }
 
     private long createGraphicsPipeline(PipelineState state) {
@@ -194,7 +199,19 @@ public class GraphicsPipeline extends Pipeline {
             pipelineInfo.basePipelineIndex(-1);
 
             if (!Vulkan.DYNAMIC_RENDERING) {
-                pipelineInfo.renderPass(state.renderPass.getId());
+                // When renderPass is null (e.g. DEFAULT PipelineState), fall back to the currently
+                // bound renderpass. This mirrors the dynamic-rendering fallback to mainFramebuffer.
+                net.vulkanmod.vulkan.framebuffer.RenderPass resolvedRenderPass = state.renderPass;
+                if (resolvedRenderPass == null) {
+                    resolvedRenderPass = Renderer.getInstance().getBoundRenderPass();
+                }
+                if (resolvedRenderPass == null) {
+                    // Last resort: skip pipeline creation for now — will retry next draw call
+                    net.vulkanmod.Initializer.LOGGER.warn(
+                        "GraphicsPipeline: renderPass is null in non-dynamic mode, deferring pipeline creation.");
+                    return VK_NULL_HANDLE;
+                }
+                pipelineInfo.renderPass(resolvedRenderPass.getId());
                 pipelineInfo.subpass(0);
             }
             else {
@@ -416,4 +433,5 @@ public class GraphicsPipeline extends Pipeline {
 
         return attributeDescriptions.rewind();
     }
-}
+                                                         }
+                                                                       
