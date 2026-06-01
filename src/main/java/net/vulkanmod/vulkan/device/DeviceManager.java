@@ -434,5 +434,5 @@ public abstract class DeviceManager {
         public IntBuffer presentModes;
     }
 
-        }
-        
+    }
+            
